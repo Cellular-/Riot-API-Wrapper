@@ -1,0 +1,1 @@
+funcs = (lambda: print("func1"), lambda: print("func2"))
