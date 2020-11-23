@@ -1,12 +1,15 @@
 import requests as r, json, sqlite3, os, atexit, sys
-from enum import Enum
+from configparser import SafeConfigParser
 
-header = { "request_header": {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept-Charset": "application/x-www-form-urlencoded; charset=UTF-8",
-                "Origin": "https://developer.riotgames.com",
-                "X-Riot-Token": os.environ["RIOT_API_KEY"]
+parser = SafeConfigParser()
+parser.read('./config/env')
+
+header = {'request_header': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Charset': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Origin': 'https://developer.riotgames.com',
+                'X-Riot-Token': parser.get('api_resources', 'key')
             }
         }
 
@@ -17,15 +20,12 @@ endpoints = {'summoner': {
             }
 
 class Summoner():
-    def _init__(self):
+    def __init__(self):
         self.summoner_name
         self.matchlist
     
     def ini(self):
         pass
-
-    
-
 
 class RiotApi():
     def __init__(self):
@@ -48,7 +48,8 @@ class RiotApi():
                                 '%(name)s',
                                 '%(profileIconId)s',
                                 '%(revisionDate)s',
-                                '%(summonerLevel)d')''' % summoner_account
+                                '%(summonerLevel)d',
+                                NULL)''' % summoner_account
 
             cursor.execute(query)
             conn.commit()
@@ -68,15 +69,18 @@ class RiotApi():
 
         return - response
         """
+
+        if not isinstance(name, str):
+            raise TypeError("Summoner name must be a string")
+    
         response = r.get(endpoints['summoner']['account']['info']\
                         .format(summoner_name=name), headers=header["request_header"])
 
         return response
 
     def summoner_matchlist(self, account_id):
-        response = response = r.get(endpoints['summoner']['stats']['match_list']\
-                            .format(account_id=account_id), 
-                            headers=header["request_header"])
+        response = r.get(endpoints['summoner']['stats']['match_list']\
+                        .format(account_id=account_id), headers=header["request_header"])
 
         return response
 
@@ -84,6 +88,7 @@ class RiotApi():
         def print_menu():
             menu = 'League of Legends Tool\n' \
                 's - Get summoner account info\n' \
+                'm - Get summoner matchlist\n' \
                 'Select an option: '
 
             print(menu)
@@ -115,15 +120,10 @@ class RiotApi():
                 while not summoner_name:
                     summoner_name = str(input('Enter a summoner name: '))
                 
-                data = self.summoner_matchlist(name=summoner_name)
-                # record_id = None
-
-                # if data:
-                #     record_id = self.summoner_store(data.json())
-                #     if record_id:
-                #         print("Added %s to database with row id %d" % (summoner_name, record_id))
-                # else:
-                #     print('Summoner `%s` does not exist' % (summoner_name,))
+                try:
+                    matchlist = self.summoner_matchlist(account_id=summoner_name)
+                except Exception as error:
+                    print(error)
 
             elif menuOption == 'q':
                 break

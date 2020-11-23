@@ -1,27 +1,36 @@
 from pytest import fixture
 from main.riotapi import RiotApi
-import time
+import time, sqlite3
 
 rapi = RiotApi()
 
 @fixture
 def account_keys():
+    """Returns a tuple of complete set of keys that should exist in a valid
+    account response from the Riot API.
+    """
     return ('id', 'accountId', 'puuid', 'name', 'profileIconId', 'revisionDate', 'summonerLevel')
 
 @fixture
 def summoner_not_found_keys():
+    """Returns a tuple of complete set of keys and their hierarchy that should
+    exits when querying the Riot API for a non-existent summoner.
+    """
     return (('status',), ('message', 'status_code'))
 
 @fixture
 def summoners_that_exist():
+    """Returns a tuple of summoners that exist."""
     return ('Pianowoahman', 'Cellular', 'Uoex')
 
 @fixture
 def summoners_that_exist_in_account_table():
+    """Returns a tuple of summoners that already exists in the account table."""
     return ('Cellular',)
 
 @fixture
 def summoners_that_dont_exist():
+    """Returns a tuple of summoners that do not exist."""
     return ('Celullar', 'dsadasdwacasbp2ub3o12c89das')
 
 @fixture
@@ -34,6 +43,18 @@ def summoner_that_exists_account_dict():
                 profileIconId=1149,
                 revisionDate=1604290860000,
                 summonerLevel=113)
+
+@fixture
+def sqlite_database_name():
+    return 'loldata.db'
+
+@fixture
+def riot_api_instance():
+    """Returns an instance of the riot api client"""
+    return RiotApi()
+
+def test_pytest_true():
+    assert True
 
 def test_get_account_info(account_keys, summoners_that_exist):
     """Test API call to get an existing summoner's account information
@@ -88,4 +109,7 @@ def test_insert_existing_summoner_account(summoner_that_exists_account_dict, sum
 
         assert row_id == None
 
-def test_get_summoner_from_db():
+def test_database_connection(sqlite_database_name):
+    connection = sqlite3.connect(sqlite_database_name)
+    assert isinstance(connection, sqlite3.Connection)
+    connection.close()
