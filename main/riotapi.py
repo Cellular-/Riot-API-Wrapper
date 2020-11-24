@@ -1,5 +1,6 @@
 import requests as r, json, sqlite3, os, atexit, sys
 from configparser import SafeConfigParser
+from customexceptions import *
 
 parser = SafeConfigParser()
 parser.read('./config/env')
@@ -37,7 +38,7 @@ class RiotApi():
             raise Exception('Summoner account record should only have 7 values.')
 
         try:
-            conn = sqlite3.connect('loldata.db')
+            conn = sqlite3.connect(parser.get('database', 'full_path'))
             cursor = conn.cursor()
 
             query = f'''insert into account
@@ -68,13 +69,18 @@ class RiotApi():
         name - summoner's name of interest
 
         return - response
-        """
 
+        raises - ApiError if summoner does not exist
+        """
         if not isinstance(name, str):
             raise TypeError("Summoner name must be a string")
+
+        endpoint = endpoints['summoner']['account']['info'].format(summoner_name=name)
+
+        response = r.get(endpoint, headers=header["request_header"])
     
-        response = r.get(endpoints['summoner']['account']['info']\
-                        .format(summoner_name=name), headers=header["request_header"])
+        if response.status_code != 200:
+            raise ApiError(endpoint, response.status_code, response.reason)
 
         return response
 
@@ -105,15 +111,16 @@ class RiotApi():
                 while not summoner_name:
                     summoner_name = str(input('Enter a summoner name: '))
                 
-                data = self.summoner_query(name=summoner_name)
-                record_id = None
+                try:
+                    data = self.summoner_query(name=summoner_name)
 
-                if data:
                     record_id = self.summoner_store(data.json())
                     if record_id:
                         print("Added %s to database with row id %d" % (summoner_name, record_id))
-                else:
-                    print('Summoner `%s` does not exist' % (summoner_name,))
+                except ApiError as error:
+                    print(error)
+                finally:
+                    record_id = None
 
             if menuOption == 'm':
                 summoner_name = None
