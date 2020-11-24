@@ -32,6 +32,13 @@ class RiotApi():
     def __init__(self):
         pass
 
+    def dict_factory(self, cursor, row):
+        results = {}
+        for index, col_name in enumerate(cursor.description):
+            results[col_name[0]] = row[index]
+
+        return results
+
     def summoner_store(self, summoner_account):
         id = None
         if len(summoner_account) > 7:
@@ -55,13 +62,13 @@ class RiotApi():
             cursor.execute(query)
             conn.commit()
             id = cursor.lastrowid
-            cursor.close()
         except sqlite3.IntegrityError as error:
             if 'UNIQUE constraint' in str(error):
                 print('The name or account id is not unique for\n %s' % summoner_account)
         except sqlite3.OperationalError as error:
             print(error)
         finally:
+            cursor.close()
             return id
 
     def summoner_query(self, name=None):
@@ -84,6 +91,12 @@ class RiotApi():
 
         return response
 
+    def summoner_get_account_info(name=None):
+        if not isinstance(name, str):
+            raise TypeError("Summoner name must be a string")
+
+        
+
     def summoner_matchlist(self, account_id):
         response = r.get(endpoints['summoner']['stats']['match_list']\
                         .format(account_id=account_id), headers=header["request_header"])
@@ -93,7 +106,8 @@ class RiotApi():
     def run_cli_tool(self):
         def print_menu():
             menu = 'League of Legends Tool\n' \
-                's - Get summoner account info\n' \
+                's - Create account record for given summoner name\n' \
+                'r - Get summoner account info from database\n' \
                 'm - Get summoner matchlist\n' \
                 'Select an option: '
 
@@ -131,6 +145,30 @@ class RiotApi():
                     matchlist = self.summoner_matchlist(account_id=summoner_name)
                 except Exception as error:
                     print(error)
+
+            if menuOption == 'r':
+                summoner_name = None
+                results = None
+                while not summoner_name:
+                    summoner_name = str(input('Enter a summoner name: '))
+
+                conn = sqlite3.connect(parser.get('database', 'full_path'))
+                conn.row_factory = self.dict_factory
+                cursor = conn.cursor()
+
+                query = f'''select * 
+                            from account 
+                            where name = \'{summoner_name}\''''
+
+                cursor.execute(query)
+                conn.commit()
+
+                results = cursor.fetchone()
+
+                for k, v in results.items():
+                    print(k, v, '\n')
+
+                conn.close()
 
             elif menuOption == 'q':
                 break
