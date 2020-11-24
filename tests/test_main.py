@@ -20,13 +20,13 @@ def summoner_not_found_keys():
 
 @fixture
 def summoners_that_exist():
-    """Returns a tuple of summoners that exist."""
+    """Returns a tuple of summoners that exist in League of Legends."""
     return ('Pianowoahman', 'Cellular', 'Uoex')
 
 @fixture
 def summoners_that_exist_in_account_table():
     """Returns a tuple of summoners that already exists in the account table."""
-    return ('Cellular',)
+    return ('Uoex',)
 
 @fixture
 def summoners_that_dont_exist():
