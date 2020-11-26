@@ -95,13 +95,40 @@ class RiotApi():
         if not isinstance(name, str):
             raise TypeError("Summoner name must be a string")
 
-        
-
     def summoner_matchlist(self, account_id):
         response = r.get(endpoints['summoner']['stats']['match_list']\
                         .format(account_id=account_id), headers=header["request_header"])
 
         return response
+
+    def summoner_store_matchlist(self, matchlist):
+        # if len(summoner_account) > 7:
+        #     raise Exception('Summoner account record should only have 7 values.')
+
+        try:
+            conn = sqlite3.connect(parser.get('database', 'full_path'))
+            cursor = conn.cursor()
+
+            query = f'''insert into matchlist
+                        values (NULL,
+                                '%(platformId)s',
+                                '%(gameId)s',
+                                '%(champion)d',
+                                '%(queue)s',
+                                '%(season)d',
+                                '%(timestamp)d',
+                                '%(role)s',
+                                '%(lane)s')'''
+
+            for match in matchlist['matches']:
+                cursor.execute(query % match)
+                conn.commit()
+        except sqlite3.IntegrityError as error:
+            print(error)
+        except sqlite3.OperationalError as error:
+            print(error)
+        finally:
+            cursor.close()
 
     def run_cli_tool(self):
         def print_menu():
@@ -139,10 +166,11 @@ class RiotApi():
             if menuOption == 'm':
                 summoner_name = None
                 while not summoner_name:
-                    summoner_name = str(input('Enter a summoner name: '))
+                    summoner_name = str(input('Enter a summoner account ID: '))
                 
                 try:
                     matchlist = self.summoner_matchlist(account_id=summoner_name)
+                    self.summoner_store_matchlist(matchlist.json())
                 except Exception as error:
                     print(error)
 
@@ -156,17 +184,18 @@ class RiotApi():
                 conn.row_factory = self.dict_factory
                 cursor = conn.cursor()
 
-                query = f'''select * 
+                query = f'''select id, accountId, name, summonerLevel
                             from account 
-                            where name = \'{summoner_name}\''''
+                            where lower(name) = \'{summoner_name.lower()}\''''
 
                 cursor.execute(query)
                 conn.commit()
 
                 results = cursor.fetchone()
 
-                for k, v in results.items():
-                    print(k, v, '\n')
+                pretty_account = f'''ID: %(id)s\nAccount ID: %(accountId)s\nName: %(name)s\nSummoner Level: %(summonerLevel)d''' % results
+
+                print(pretty_account)
 
                 conn.close()
 
