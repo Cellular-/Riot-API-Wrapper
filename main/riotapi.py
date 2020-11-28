@@ -1,6 +1,9 @@
-import requests as r, json, sqlite3, os, atexit, sys
+import requests as r, json, sqlite3, os, atexit, sys, inspect
+from apiresources import Account, Matchlist
 from configparser import SafeConfigParser
 from customexceptions import *
+from datetime import datetime
+from enum import Enum
 
 parser = SafeConfigParser()
 parser.read('./config/env')
@@ -20,14 +23,6 @@ endpoints = {'summoner': {
                 }
             }
 
-class Summoner():
-    def __init__(self):
-        self.summoner_name
-        self.matchlist
-    
-    def ini(self):
-        pass
-
 class RiotApi():
     def __init__(self):
         pass
@@ -41,8 +36,9 @@ class RiotApi():
 
     def summoner_store(self, summoner_account):
         id = None
-        if len(summoner_account) > 7:
-            raise Exception('Summoner account record should only have 7 values.')
+
+        if not isinstance(summoner_account, Account):
+            raise TypeError('An instance of the Account class must be passed in.')
 
         try:
             conn = sqlite3.connect(parser.get('database', 'full_path'))
@@ -57,7 +53,7 @@ class RiotApi():
                                 '%(profileIconId)s',
                                 '%(revisionDate)s',
                                 '%(summonerLevel)d',
-                                NULL)''' % summoner_account
+                                '{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')''' % vars(summoner_account)
 
             cursor.execute(query)
             conn.commit()
@@ -66,6 +62,8 @@ class RiotApi():
             if 'UNIQUE constraint' in str(error):
                 print('The name or account id is not unique for\n %s' % summoner_account)
         except sqlite3.OperationalError as error:
+            print(error)
+        except Exception as error:
             print(error)
         finally:
             cursor.close()
@@ -89,9 +87,9 @@ class RiotApi():
         if response.status_code != 200:
             raise ApiError(endpoint, response.status_code, response.reason)
 
-        return response
+        return Account(**response.json())
 
-    def summoner_get_account_info(name=None):
+    def summoner_get_account_info(self, name=None):
         if not isinstance(name, str):
             raise TypeError("Summoner name must be a string")
 
@@ -102,9 +100,6 @@ class RiotApi():
         return response
 
     def summoner_store_matchlist(self, matchlist):
-        # if len(summoner_account) > 7:
-        #     raise Exception('Summoner account record should only have 7 values.')
-
         try:
             conn = sqlite3.connect(parser.get('database', 'full_path'))
             cursor = conn.cursor()
@@ -131,78 +126,89 @@ class RiotApi():
             cursor.close()
 
     def run_cli_tool(self):
+        def add_summoner():
+            summoner_name = None
+            while not summoner_name:
+                summoner_name = str(input('Enter a summoner name: '))
+
+            try:
+                account = self.summoner_query(name=summoner_name)
+
+                record_id = self.summoner_store(account)
+                if record_id:
+                    print("Added %s to database with row id %d" % (account.name, record_id))
+            except ApiError as error:
+                print(error)
+            finally:
+                record_id = None
+
+        def get_matchlist():
+            summoner_name = None
+            while not summoner_name:
+                summoner_name = str(input('Enter a summoner account ID: '))
+            
+            try:
+                matchlist_data = self.summoner_matchlist(account_id=summoner_name)
+                matchlist = Matchlist(**matchlist_data)
+
+                self.summoner_store_matchlist(matchlist.json())
+            except Exception as error:
+                print(error)
+
+        def get_account_info():
+            summoner_name = None
+            results = None
+            while not summoner_name:
+                summoner_name = str(input('Enter a summoner name: '))
+
+            conn = sqlite3.connect(parser.get('database', 'full_path'))
+            conn.row_factory = self.dict_factory
+            cursor = conn.cursor()
+
+            query = f'''select id, accountId, name, summonerLevel
+                        from account 
+                        where lower(name) = \'{summoner_name.lower()}\''''
+
+            cursor.execute(query)
+            conn.commit()
+            account_info = Account(**cursor.fetchone())
+            conn.close()
+
+            print('\n')
+            print('*' * len(account_info.accountId))
+            print("Account information for {}".format(account_info.name))
+            print(account_info)
+            print('*' * 50)
+            print('\n')
+
         def print_menu():
             menu = 'League of Legends Tool\n' \
                 's - Create account record for given summoner name\n' \
                 'r - Get summoner account info from database\n' \
                 'm - Get summoner matchlist\n' \
+                'p - Print menu' \
+                'q - quit\n' \
                 'Select an option: '
 
             print(menu)
 
-        data = None
-        while True:
-            menuOption = 'z'
-            if not menuOption.lower() in ('s', 'q'):
-                print_menu()
-                menuOption = str(input())
+        menu_commands = {'s': add_summoner,
+                         'm': get_matchlist,
+                         'r': get_account_info,
+                         'q': lambda: sys.exit(0),
+                         'p': print_menu}
 
-            if menuOption == 's':
-                summoner_name = None
-                while not summoner_name:
-                    summoner_name = str(input('Enter a summoner name: '))
-                
-                try:
-                    data = self.summoner_query(name=summoner_name)
+        def is_valid_menu_option(menu_option):
+            return menu_option in [command for command in menu_commands.keys()]
 
-                    record_id = self.summoner_store(data.json())
-                    if record_id:
-                        print("Added %s to database with row id %d" % (summoner_name, record_id))
-                except ApiError as error:
-                    print(error)
-                finally:
-                    record_id = None
-
-            if menuOption == 'm':
-                summoner_name = None
-                while not summoner_name:
-                    summoner_name = str(input('Enter a summoner account ID: '))
-                
-                try:
-                    matchlist = self.summoner_matchlist(account_id=summoner_name)
-                    self.summoner_store_matchlist(matchlist.json())
-                except Exception as error:
-                    print(error)
-
-            if menuOption == 'r':
-                summoner_name = None
-                results = None
-                while not summoner_name:
-                    summoner_name = str(input('Enter a summoner name: '))
-
-                conn = sqlite3.connect(parser.get('database', 'full_path'))
-                conn.row_factory = self.dict_factory
-                cursor = conn.cursor()
-
-                query = f'''select id, accountId, name, summonerLevel
-                            from account 
-                            where lower(name) = \'{summoner_name.lower()}\''''
-
-                cursor.execute(query)
-                conn.commit()
-
-                results = cursor.fetchone()
-
-                pretty_account = f'''ID: %(id)s\nAccount ID: %(accountId)s\nName: %(name)s\nSummoner Level: %(summonerLevel)d''' % results
-
-                print(pretty_account)
-
-                conn.close()
-
-            elif menuOption == 'q':
-                break
-
-            print("\n")
+        while(True):
+            print_menu()
+            menu_option = str(input())
+            
+            while(not is_valid_menu_option(menu_option)):
+                menu_option = str(input())
+            
+            menu_commands[menu_option]()
 
 if __name__ == '__main__':
     from atexit_functions import funcs
