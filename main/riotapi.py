@@ -58,6 +58,7 @@ class RiotApi():
             cursor.execute(query)
             conn.commit()
             id = cursor.lastrowid
+            cursor.close()
         except sqlite3.IntegrityError as error:
             if 'UNIQUE constraint' in str(error):
                 print('The name or account id is not unique for\n %s' % summoner_account)
@@ -66,7 +67,6 @@ class RiotApi():
         except Exception as error:
             print(error)
         finally:
-            cursor.close()
             return id
 
     def summoner_query(self, name=None):
@@ -186,7 +186,7 @@ class RiotApi():
                 's - Create account record for given summoner name\n' \
                 'r - Get summoner account info from database\n' \
                 'm - Get summoner matchlist\n' \
-                'p - Print menu' \
+                'p - Print menu\n' \
                 'q - quit\n' \
                 'Select an option: '
 
