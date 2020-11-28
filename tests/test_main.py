@@ -2,8 +2,6 @@ from pytest import fixture
 from main.riotapi import RiotApi
 import time, sqlite3
 
-rapi = RiotApi()
-
 @fixture
 def account_keys():
     """Returns a tuple of complete set of keys that should exist in a valid
