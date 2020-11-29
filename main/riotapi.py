@@ -171,15 +171,19 @@ class RiotApi():
 
             cursor.execute(query)
             conn.commit()
-            account_info = Account(**cursor.fetchone())
+            result = cursor.fetchone()
             conn.close()
-
-            print('\n')
-            print('*' * len(account_info.accountId))
-            print("Account information for {}".format(account_info.name))
-            print(account_info)
-            print('*' * 50)
-            print('\n')
+            
+            if not result:
+                print(f'{summoner_name} does not exist in the Account table yet.')
+            else:
+                account_info = Account(**result)
+                print('\n')
+                print('*' * len(account_info.accountId))
+                print("Account information for {}".format(account_info.name))
+                print(account_info)
+                print('*' * 50)
+                print('\n')
 
         def print_menu():
             menu = 'League of Legends Tool\n' \
