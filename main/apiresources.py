@@ -34,3 +34,12 @@ class Endpoint(object):
 
     account = endpoints['summoner']['account']['info']
     matchlist = endpoints['summoner']['stats']['matchlist']
+
+class Header(object):
+    base_request = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Charset': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Origin': 'https://developer.riotgames.com',
+                'X-Riot-Token': ''
+            }

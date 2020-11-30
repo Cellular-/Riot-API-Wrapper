@@ -2,24 +2,16 @@ import requests as r, json, sqlite3, os, atexit, sys, inspect
 import apiresources, customexceptions
 from configparser import ConfigParser
 from datetime import datetime
-from apiresources import Account, Matchlist, Endpoint
+from apiresources import Account, Matchlist, Endpoint, Header
 from customexceptions import ApiError
 
 parser = ConfigParser()
 parser.read('env')
 
-header = {'request_header': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Charset': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'Origin': 'https://developer.riotgames.com',
-                'X-Riot-Token': parser.get('api_resources', 'key')
-            }
-        }
-
 class RiotApi():
     def __init__(self):
-        pass
+        self.header = Header.base_request
+        self.header['X-Riot-Token'] = parser.get('api_resources', 'key')
 
     def dict_factory(self, cursor, row):
         """Converts database results into a dictionary where the 
@@ -80,7 +72,7 @@ class RiotApi():
 
         endpoint = Endpoint.account.format(summoner_name=name)
 
-        response = r.get(endpoint, headers=header["request_header"])
+        response = r.get(endpoint, headers=self.header)
     
         if response.status_code != 200:
             raise ApiError(endpoint, response.status_code, response.reason)
@@ -92,7 +84,7 @@ class RiotApi():
             raise TypeError("Summoner name must be a string")
 
     def summoner_matchlist(self, account_id):
-        response = r.get(Endpoint.matchlist.format(account_id=account_id), headers=header["request_header"])
+        response = r.get(Endpoint.matchlist.format(account_id=account_id), headers=self.header)
 
         return response
 
