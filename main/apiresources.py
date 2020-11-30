@@ -24,3 +24,13 @@ class Matchlist():
 
     def __str__(self):
         return "\n".join([f'{attribute} : {value}' for attribute, value in self.__dict__.items()])
+
+class Endpoint(object):
+    endpoints = {'summoner': {
+                    'account': {'info': 'https://na1.api.riotgames.com/lol/summoner/v4/summoners/by-name/{summoner_name}'},
+                    'stats': {'matchlist': 'https://na1.api.riotgames.com/lol/match/v4/matchlists/by-account/{account_id}'}
+                }
+            }
+
+    account = endpoints['summoner']['account']['info']
+    matchlist = endpoints['summoner']['stats']['matchlist']

@@ -1,12 +1,12 @@
 import requests as r, json, sqlite3, os, atexit, sys, inspect
-from apiresources import Account, Matchlist
-from configparser import SafeConfigParser
-from customexceptions import *
+import apiresources, customexceptions
+from configparser import ConfigParser
 from datetime import datetime
-from enum import Enum
+from apiresources import Account, Matchlist, Endpoint
+from customexceptions import ApiError
 
-parser = SafeConfigParser()
-parser.read('./config/env')
+parser = ConfigParser()
+parser.read('env')
 
 header = {'request_header': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
@@ -17,17 +17,14 @@ header = {'request_header': {
             }
         }
 
-endpoints = {'summoner': {
-                    'account': {'info': 'https://na1.api.riotgames.com/lol/summoner/v4/summoners/by-name/{summoner_name}'},
-                    'stats': {'match_list': 'https://na1.api.riotgames.com/lol/match/v4/matchlists/by-account/{account_id}'}
-                }
-            }
-
 class RiotApi():
     def __init__(self):
         pass
 
     def dict_factory(self, cursor, row):
+        """Converts database results into a dictionary where the 
+        key is the column name and the value is the column value.
+        """
         results = {}
         for index, col_name in enumerate(cursor.description):
             results[col_name[0]] = row[index]
@@ -41,7 +38,8 @@ class RiotApi():
             raise TypeError('An instance of the Account class must be passed in.')
 
         try:
-            conn = sqlite3.connect(parser.get('database', 'full_path'))
+            db_path = parser.get('database', 'full_path')
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
 
             query = f'''insert into account
@@ -80,7 +78,7 @@ class RiotApi():
         if not isinstance(name, str):
             raise TypeError("Summoner name must be a string")
 
-        endpoint = endpoints['summoner']['account']['info'].format(summoner_name=name)
+        endpoint = Endpoint.account.format(summoner_name=name)
 
         response = r.get(endpoint, headers=header["request_header"])
     
@@ -94,14 +92,14 @@ class RiotApi():
             raise TypeError("Summoner name must be a string")
 
     def summoner_matchlist(self, account_id):
-        response = r.get(endpoints['summoner']['stats']['match_list']\
-                        .format(account_id=account_id), headers=header["request_header"])
+        response = r.get(Endpoint.matchlist.format(account_id=account_id), headers=header["request_header"])
 
         return response
 
     def summoner_store_matchlist(self, matchlist):
         try:
-            conn = sqlite3.connect(parser.get('database', 'full_path'))
+            db_path = parser.get('database', 'full_path')
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
 
             query = f'''insert into matchlist
@@ -125,98 +123,7 @@ class RiotApi():
         finally:
             cursor.close()
 
-    def run_cli_tool(self):
-        def add_summoner():
-            summoner_name = None
-            while not summoner_name:
-                summoner_name = str(input('Enter a summoner name: '))
-
-            try:
-                account = self.summoner_query(name=summoner_name)
-
-                record_id = self.summoner_store(account)
-                if record_id:
-                    print("Added %s to database with row id %d" % (account.name, record_id))
-            except ApiError as error:
-                print(error)
-            finally:
-                record_id = None
-
-        def get_matchlist():
-            summoner_name = None
-            while not summoner_name:
-                summoner_name = str(input('Enter a summoner account ID: '))
-            
-            try:
-                matchlist_data = self.summoner_matchlist(account_id=summoner_name)
-                matchlist = Matchlist(**matchlist_data)
-
-                self.summoner_store_matchlist(matchlist.json())
-            except Exception as error:
-                print(error)
-
-        def get_account_info():
-            summoner_name = None
-            results = None
-            while not summoner_name:
-                summoner_name = str(input('Enter a summoner name: '))
-
-            conn = sqlite3.connect(parser.get('database', 'full_path'))
-            conn.row_factory = self.dict_factory
-            cursor = conn.cursor()
-
-            query = f'''select id, accountId, name, summonerLevel
-                        from account 
-                        where lower(name) = \'{summoner_name.lower()}\''''
-
-            cursor.execute(query)
-            conn.commit()
-            result = cursor.fetchone()
-            conn.close()
-            
-            if not result:
-                print(f'{summoner_name} does not exist in the Account table yet.')
-            else:
-                account_info = Account(**result)
-                print('\n')
-                print('*' * len(account_info.accountId))
-                print("Account information for {}".format(account_info.name))
-                print(account_info)
-                print('*' * 50)
-                print('\n')
-
-        def print_menu():
-            menu = 'League of Legends Tool\n' \
-                's - Create account record for given summoner name\n' \
-                'r - Get summoner account info from database\n' \
-                'm - Get summoner matchlist\n' \
-                'p - Print menu\n' \
-                'q - quit\n' \
-                'Select an option: '
-
-            print(menu)
-
-        menu_commands = {'s': add_summoner,
-                         'm': get_matchlist,
-                         'r': get_account_info,
-                         'q': lambda: sys.exit(0),
-                         'p': print_menu}
-
-        def is_valid_menu_option(menu_option):
-            return menu_option in [command for command in menu_commands.keys()]
-
-        while(True):
-            print_menu()
-            menu_option = str(input())
-            
-            while(not is_valid_menu_option(menu_option)):
-                menu_option = str(input())
-            
-            menu_commands[menu_option]()
-
 if __name__ == '__main__':
     from atexit_functions import funcs
     for func in funcs:
         atexit.register(func)
-
-    RiotApi().run_cli_tool()
