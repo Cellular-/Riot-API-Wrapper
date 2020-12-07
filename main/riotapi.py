@@ -4,6 +4,7 @@ from configparser import ConfigParser
 from datetime import datetime
 from apiresources import Account, Matchlist, Endpoint, Header
 from customexceptions import ApiError
+from decorators import rate_limit
 
 parser = ConfigParser()
 parser.read('env')
@@ -59,6 +60,7 @@ class RiotApi():
         finally:
             return id
 
+    @rate_limit
     def summoner_query(self, name=None):
         """
         name - summoner's name of interest
@@ -83,6 +85,7 @@ class RiotApi():
         if not isinstance(name, str):
             raise TypeError("Summoner name must be a string")
 
+    @rate_limit
     def summoner_matchlist(self, account_id):
         response = r.get(Endpoint.matchlist.format(account_id=account_id), headers=self.header)
 
