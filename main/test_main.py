@@ -1,7 +1,7 @@
 import pytest
 from customexceptions import *
 from apiresources import Account, Matchlist, Endpoint
-import time, sqlite3, riotapi
+import time, sqlite3, riotapi, decorators
 
 @pytest.fixture
 def account_keys():
@@ -104,3 +104,23 @@ def test_database_connection(sqlite_database_name):
     connection = sqlite3.connect(sqlite_database_name)
     assert isinstance(connection, sqlite3.Connection)
     connection.close()
+
+@pytest.mark.api
+def test_rate_limiter():
+    start_time = time.time()
+
+    @decorators.rate_limit
+    def my_func():
+        pass
+
+    for i in range(10):
+        my_func()
+    
+    end_time = time.time()
+
+    """Rate limit decorator sleeps the program execution every .5 seconds
+    so a function called 10 times should only run 5 times.
+
+    The acceptable margin is less than .25 seconds.
+    """
+    assert end_time - start_time - 5 < .25
